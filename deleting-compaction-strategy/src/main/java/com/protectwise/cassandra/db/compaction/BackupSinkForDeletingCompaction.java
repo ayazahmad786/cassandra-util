@@ -18,9 +18,12 @@ package com.protectwise.cassandra.db.compaction;
 import com.protectwise.cassandra.retrospect.deletion.CassandraPurgedData;
 import com.protectwise.cassandra.util.PrintHelper;
 import com.protectwise.cassandra.util.SerializerMetaDataFactory;
+import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.ColumnDefinition;
 import org.apache.cassandra.db.*;
 import org.apache.cassandra.db.columniterator.OnDiskAtomIterator;
+import org.apache.cassandra.db.marshal.AbstractType;
+import org.apache.cassandra.db.marshal.CompositeType;
 import org.apache.cassandra.io.sstable.SSTableWriter;
 import org.apache.cassandra.io.sstable.metadata.MetadataCollector;
 import org.apache.cassandra.service.ActiveRepairService;
@@ -34,7 +37,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Properties;
 import java.util.function.Consumer;
 
@@ -129,11 +134,14 @@ public class BackupSinkForDeletingCompaction implements IDeletedRecordsSink
 			if(columnDefinition.isPrimaryKeyColumn()) {
 				logger.info("primary key: {}", column.name().cql3ColumnName(columnFamily.metadata()).toString());
 				purgedData.addPartitonKey(column.name().cql3ColumnName(columnFamily.metadata()).toString(),
-						SerializerMetaDataFactory.getSerializerMetaData(columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer()), column.value());
+						SerializerMetaDataFactory.getSerializerMetaData(columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer()),
+						column.value(), Long.valueOf(column.timestamp()));
 				return;
 			} else {
 				purgedData.addNonKeyColumn(column.name().cql3ColumnName(columnFamily.metadata()).toString(),
-						SerializerMetaDataFactory.getSerializerMetaData(columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer()), column.value());
+						SerializerMetaDataFactory.getSerializerMetaData(columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer()),
+						column.value(),
+						Long.valueOf(column.timestamp()));
 			}
 			try {
 				if (column.value() != null && column.value().array().length > 0) {
@@ -155,9 +163,11 @@ public class BackupSinkForDeletingCompaction implements IDeletedRecordsSink
 		cassandraPurgedData.setKsName(columnFamily.metadata().ksName);
 		cassandraPurgedData.setCfName(columnFamily.metadata().cfName);
 
-		//TODO: retrieve partion key, clustering key value and put in the serializerMetaData
+		//retrieve partition key, clustering key value and put in the serializerMetaData
+		handlePartitionKey(currentKey, columnFamily.metadata(), cassandraPurgedData);
 		columnFamily.forEach(cell-> {
-			logger.info("Clustering keys: {}", PrintHelper.printClusteringKeys(cell, columnFamily.metadata()));
+			//logger.info("Clustering keys: {}", PrintHelper.printClusteringKeys(cell, columnFamily.metadata()));
+			handleClusteringKey(cell, columnFamily.metadata(), cassandraPurgedData);
 			handleNonLocalArchiving(cell, cassandraPurgedData);
 			printCell.accept(cell);
 		});
@@ -170,10 +180,40 @@ public class BackupSinkForDeletingCompaction implements IDeletedRecordsSink
 
 		try {
 			backupRowproducer.send(new ProducerRecord<String, String>(cassandraPurgedKafkaTopic, key, objectMapper.writeValueAsString(cassandraPurgedData)));
-			//backupRowproducer.send(new ProducerRecord<String, String>(cassandraPurgedKafkaTopic, key, ByteBufferUtil.string(columnFamily.toBytes(), StandardCharsets.UTF_8)));
-			//CassandraPurgedData cassandraPurgedData = new
 		} catch (Exception e) {
 			logger.info("Exception occurred while queuing data: {}", e);
+		}
+	}
+
+	private void handleClusteringKey(Cell cell, CFMetaData metadata, CassandraPurgedData cassandraPurgedData) {
+		for (ColumnDefinition def : metadata.clusteringColumns()) {
+			try {
+				cassandraPurgedData.addClusteringKey(ByteBufferUtil.string(def.name.bytes),
+						SerializerMetaDataFactory.getSerializerMetaData(def.type.getSerializer()), cell.name().get(def.position()), null);
+			}catch(Exception e) {
+				throw new RuntimeException(e);
+			}
+		}
+	}
+
+	private void handlePartitionKey(DecoratedKey currentKey, CFMetaData metadata, CassandraPurgedData cassandraPurgedData) {
+		ByteBuffer[] keyParts;
+		AbstractType<?> validator = metadata.getKeyValidator();
+		if (validator instanceof CompositeType) {
+			keyParts = ((CompositeType) validator).split(currentKey.getKey());
+		} else {
+			keyParts = new ByteBuffer[]{
+					currentKey.getKey()
+			};
+		}
+		List<ColumnDefinition> pkc = metadata.partitionKeyColumns();
+		for (ColumnDefinition def : pkc) {
+			try {
+				cassandraPurgedData.addPartitonKey(ByteBufferUtil.string(def.name.bytes),
+						SerializerMetaDataFactory.getSerializerMetaData(def.type.getSerializer()), keyParts[def.position()], null);
+			}catch(Exception e) {
+				throw new RuntimeException(e);
+			}
 		}
 	}
 

@@ -16,6 +16,10 @@ public class TimestampSerializerMetaData extends SerializerMetaData {
 
     @Override
     public SerializerMetaData getSerializerMetaData(TypeSerializer typeSerializer) {
-        return null;
+        if(typeSerializer instanceof  TimestampSerializer) {
+            return this;
+        } else {
+            throw new RuntimeException("type serializer: " + typeSerializer.getClass().getName() + " is not compatible for class " + this.getClass().getName());
+        }
     }
 }

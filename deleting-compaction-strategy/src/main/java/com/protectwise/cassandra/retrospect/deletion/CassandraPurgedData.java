@@ -25,7 +25,7 @@ public class CassandraPurgedData implements Serializable {
 
     private Map<String, SerializerMetaData> columnSerializerMetaDatas = new HashMap<>();
 
-    private Map<String, byte[]> columnSerializedValues = new HashMap<>();
+    private Map<String, SerializableColumnData> columnSerializedValues = new HashMap<>();
 
     public Set<String> getPartitonKeys() {
         return partitonKeys;
@@ -51,11 +51,11 @@ public class CassandraPurgedData implements Serializable {
         this.columnSerializerMetaDatas = columnSerializerMetaDatas;
     }
 
-    public Map<String, byte[]> getColumnSerializedValues() {
+    public Map<String, SerializableColumnData> getColumnSerializedValues() {
         return columnSerializedValues;
     }
 
-    public void setColumnSerializedValues(Map<String, byte[]> columnSerializedValues) {
+    public void setColumnSerializedValues(Map<String, SerializableColumnData> columnSerializedValues) {
         this.columnSerializedValues = columnSerializedValues;
     }
 
@@ -77,23 +77,35 @@ public class CassandraPurgedData implements Serializable {
         this.cfName = cfName;
     }
 
-    public CassandraPurgedData addPartitonKey(String key, SerializerMetaData serializerMetaData, ByteBuffer value) {
+    public CassandraPurgedData addPartitonKey(String key, SerializerMetaData serializerMetaData, ByteBuffer value, Long timestamp) {
         partitonKeys.add(key);
         columnSerializerMetaDatas.put(key, serializerMetaData);
-        columnSerializedValues.put(key, ByteBufferUtil.getArray(value));
+        SerializableColumnData columnData = getSerializableColumnData(value, timestamp);
+        columnSerializedValues.put(key, columnData);
         return this;
     }
 
-    public CassandraPurgedData addClusteringKey(String key, SerializerMetaData serializerMetaData, ByteBuffer value) {
+    public CassandraPurgedData addClusteringKey(String key, SerializerMetaData serializerMetaData, ByteBuffer value, Long timestamp) {
         clusterKeys.add(key);
         columnSerializerMetaDatas.put(key, serializerMetaData);
-        columnSerializedValues.put(key, ByteBufferUtil.getArray(value));
+
+        SerializableColumnData columnData = getSerializableColumnData(value, timestamp);
+
+        columnSerializedValues.put(key, columnData);
         return this;
     }
 
-    public CassandraPurgedData addNonKeyColumn(String name, SerializerMetaData serializerMetaData, ByteBuffer value) {
+    private SerializableColumnData getSerializableColumnData(ByteBuffer value, Long timestamp) {
+        SerializableColumnData columnData = new SerializableColumnData();
+        columnData.setValue(ByteBufferUtil.getArray(value));
+        columnData.setTimestamp(timestamp);
+        return columnData;
+    }
+
+    public CassandraPurgedData addNonKeyColumn(String name, SerializerMetaData serializerMetaData, ByteBuffer value, Long timestamp) {
         columnSerializerMetaDatas.put(name, serializerMetaData);
-        columnSerializedValues.put(name, ByteBufferUtil.getArray(value));
+        SerializableColumnData columnData = getSerializableColumnData(value, timestamp);
+        columnSerializedValues.put(name, columnData);
         return this;
     }
 }

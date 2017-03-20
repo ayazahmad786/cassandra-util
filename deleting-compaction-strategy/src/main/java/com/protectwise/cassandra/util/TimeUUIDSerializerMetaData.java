@@ -16,6 +16,10 @@ public class TimeUUIDSerializerMetaData extends SerializerMetaData {
 
     @Override
     public SerializerMetaData getSerializerMetaData(TypeSerializer typeSerializer) {
-        return null;
+        if(typeSerializer instanceof TimeUUIDSerializer) {
+            return this;
+        } else {
+            throw new RuntimeException("type serializer: " + typeSerializer.getClass().getName() + " is not compatible for class " + this.getClass().getName());
+        }
     }
 }

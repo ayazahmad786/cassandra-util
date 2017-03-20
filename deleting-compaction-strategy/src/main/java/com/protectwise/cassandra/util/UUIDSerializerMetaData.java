@@ -1,5 +1,6 @@
 package com.protectwise.cassandra.util;
 
+
 import org.apache.cassandra.serializers.TypeSerializer;
 import org.apache.cassandra.serializers.UUIDSerializer;
 import org.codehaus.jackson.annotate.JsonTypeName;
@@ -16,6 +17,10 @@ public class UUIDSerializerMetaData extends SerializerMetaData {
 
     @Override
     public SerializerMetaData getSerializerMetaData(TypeSerializer typeSerializer) {
-        return null;
+        if(typeSerializer instanceof UUIDSerializer) {
+            return this;
+        } else {
+            throw new RuntimeException("type serializer: " + typeSerializer.getClass().getName() + " is not compatible for class " + this.getClass().getName());
+        }
     }
 }
