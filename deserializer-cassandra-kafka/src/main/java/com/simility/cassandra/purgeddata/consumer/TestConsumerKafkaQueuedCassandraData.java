@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
@@ -16,7 +17,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 
 import org.codehaus.jackson.map.ObjectMapper;
 import com.protectwise.cassandra.retrospect.deletion.CassandraPurgedData;
-import com.protectwise.cassandra.retrospect.deletion.SerializableColumnData;
+import com.protectwise.cassandra.retrospect.deletion.SerializableCellData;
 import com.protectwise.cassandra.util.SerializerMetaData;
 
 public class TestConsumerKafkaQueuedCassandraData {
@@ -51,11 +52,20 @@ public class TestConsumerKafkaQueuedCassandraData {
 		try {
 			return objectMapper.readValue(json, CassandraPurgedData.class);
 		} catch (Exception e) {
-			//e.printStackTrace();
 			throw new RuntimeException(e);
 		}
 	}
-	
+
+	private static void printDeserializedValues(CassandraPurgedData purgedData) {
+		for(Entry<String, SerializerMetaData> columnSerializedMetaDataEntry : purgedData.getColumnSerializerMetaDatas().entrySet()) {
+			for(Entry<String, SerializableCellData> entry :purgedData.getColumnSerializedValues().entrySet()) {
+				int index = entry.getValue().getCellId().indexOf(columnSerializedMetaDataEntry.getKey());
+				if(index == 0) {
+					System.out.println(entry.getKey() + "=" + columnSerializedMetaDataEntry.getValue().getCellValue(entry.getValue().getValue()));
+				}
+			}
+		}
+	}
 	public static void main(String []args) {
 		TestConsumerKafkaQueuedCassandraData testConsumer = new TestConsumerKafkaQueuedCassandraData();
 		testConsumer.subscribe();
@@ -70,22 +80,26 @@ public class TestConsumerKafkaQueuedCassandraData {
 					System.out.println(record.value());
 					count.incrementAndGet();
 					CassandraPurgedData purgedData = testConsumer.getObject(record.value());
-					for(Entry<String, SerializableColumnData> entry :purgedData.getColumnSerializedValues().entrySet()) {
-						System.out.println(entry.getKey() + ":" + 
-											purgedData.getColumnSerializerMetaDatas().get(entry.getKey()).getSerializer().deserialize(ByteBuffer.wrap(entry.getValue().getValue())));
-					}
+					//printCellSerializedContent(purgedData);
+					printDeserializedValues(purgedData);
 				}catch(Exception e) {
 					e.printStackTrace();
 					int x = 5;
 				}
 			});
 			try {
-				Thread.sleep(5000);
+				Thread.sleep(500);
 			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				//e.printStackTrace();
+				e.printStackTrace();
 			}
 			System.out.println("Total records: " + count.get());
 		}
+	}
+
+	private static void printCellSerializedContent(CassandraPurgedData purgedData) {
+		for(Entry<String, SerializableCellData> entry :purgedData.getColumnSerializedValues().entrySet()) {
+            System.out.println(entry.getKey() + "= " +
+                                entry.getValue().getValue());
+        }
 	}
 }

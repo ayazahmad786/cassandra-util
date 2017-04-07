@@ -22,10 +22,12 @@ import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.ColumnDefinition;
 import org.apache.cassandra.db.*;
 import org.apache.cassandra.db.columniterator.OnDiskAtomIterator;
+import org.apache.cassandra.db.composites.CellNameType;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.CompositeType;
 import org.apache.cassandra.io.sstable.SSTableWriter;
 import org.apache.cassandra.io.sstable.metadata.MetadataCollector;
+import org.apache.cassandra.serializers.SetSerializer;
 import org.apache.cassandra.service.ActiveRepairService;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.commons.math3.filter.KalmanFilter;
@@ -38,7 +40,9 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.function.Consumer;
@@ -113,9 +117,10 @@ public class BackupSinkForDeletingCompaction implements IDeletedRecordsSink
 			}
 			try {
 				if (column.value() != null && column.value().array().length > 0) {
-					logger.info("column identifier:{}", column.name().cql3ColumnName(columnFamily.metadata()).toString());
-					logger.info("Column value: {}", columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer().deserialize(column.value()));
-					logger.info("Column serilizer: {}", columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer().getClass().getName());
+					//logger.info("column identifier:{}", column.name().cql3ColumnName(columnFamily.metadata()).toString());
+					//logger.info("Column value: {}", columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer().deserialize(column.value()));
+					//logger.info("Column serilizer: {}", columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer().getClass().getName());
+					int x = 1;
 				}
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
@@ -127,6 +132,7 @@ public class BackupSinkForDeletingCompaction implements IDeletedRecordsSink
 	private void handleNonLocalArchiving(Cell cell, CassandraPurgedData purgedData) {
 		if (cell != null)  {
 			Cell column = cell;
+
 			ColumnDefinition columnDefinition = columnFamily.metadata().getColumnDefinition(column.name());
 			if(columnDefinition == null) {
 				return;
@@ -138,20 +144,14 @@ public class BackupSinkForDeletingCompaction implements IDeletedRecordsSink
 						column.value(), Long.valueOf(column.timestamp()));
 				return;
 			} else {
-				purgedData.addNonKeyColumn(column.name().cql3ColumnName(columnFamily.metadata()).toString(),
-						SerializerMetaDataFactory.getSerializerMetaData(columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer()),
-						column.value(),
-						Long.valueOf(column.timestamp()));
-			}
-			try {
-				if (column.value() != null && column.value().array().length > 0) {
-					logger.info("column identifier:{}", column.name().cql3ColumnName(columnFamily.metadata()).toString());
-					logger.info("Column value: {}", columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer().deserialize(column.value()));
-					logger.info("Column serilizer: {}", columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer().getClass().getName());
-				}
-			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				//logger.debug("column definition is: {}", columnDefinition);
+/*					purgedData.addNonKeyColumn(column.name().cql3ColumnName(columnFamily.metadata()).toString(),
+							SerializerMetaDataFactory.getSerializerMetaData(columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer()),
+							column.value(),
+							Long.valueOf(column.timestamp()));*/
+
+				purgedData.addNonKeyCell(SerializerMetaDataFactory.getSerializableCellData(cell, columnFamily), column.name().cql3ColumnName(columnFamily.metadata()).toString(), SerializerMetaDataFactory.getSerializerMetaData(columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer()));
+
 			}
 		}
 	}
@@ -169,7 +169,7 @@ public class BackupSinkForDeletingCompaction implements IDeletedRecordsSink
 			//logger.info("Clustering keys: {}", PrintHelper.printClusteringKeys(cell, columnFamily.metadata()));
 			handleClusteringKey(cell, columnFamily.metadata(), cassandraPurgedData);
 			handleNonLocalArchiving(cell, cassandraPurgedData);
-			printCell.accept(cell);
+			//printCell.accept(cell);
 		});
 
 
@@ -180,6 +180,7 @@ public class BackupSinkForDeletingCompaction implements IDeletedRecordsSink
 
 		try {
 			backupRowproducer.send(new ProducerRecord<String, String>(cassandraPurgedKafkaTopic, key, objectMapper.writeValueAsString(cassandraPurgedData)));
+			int x = 2;
 		} catch (Exception e) {
 			logger.info("Exception occurred while queuing data: {}", e);
 		}

@@ -1,6 +1,8 @@
 package com.protectwise.cassandra.retrospect.deletion;
 
 import com.protectwise.cassandra.util.SerializerMetaData;
+import org.apache.cassandra.db.Cell;
+import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
 import java.io.Serializable;
@@ -25,7 +27,7 @@ public class CassandraPurgedData implements Serializable {
 
     private Map<String, SerializerMetaData> columnSerializerMetaDatas = new HashMap<>();
 
-    private Map<String, SerializableColumnData> columnSerializedValues = new HashMap<>();
+    private Map<String, SerializableCellData> cellSerializedValues = new HashMap<>();
 
     public Set<String> getPartitonKeys() {
         return partitonKeys;
@@ -51,12 +53,12 @@ public class CassandraPurgedData implements Serializable {
         this.columnSerializerMetaDatas = columnSerializerMetaDatas;
     }
 
-    public Map<String, SerializableColumnData> getColumnSerializedValues() {
-        return columnSerializedValues;
+    public Map<String, SerializableCellData> getColumnSerializedValues() {
+        return cellSerializedValues;
     }
 
-    public void setColumnSerializedValues(Map<String, SerializableColumnData> columnSerializedValues) {
-        this.columnSerializedValues = columnSerializedValues;
+    public void setColumnSerializedValues(Map<String, SerializableCellData> cellSerializedValues) {
+        this.cellSerializedValues = cellSerializedValues;
     }
 
 
@@ -77,7 +79,7 @@ public class CassandraPurgedData implements Serializable {
         this.cfName = cfName;
     }
 
-    public CassandraPurgedData addPartitonKey(String key, SerializerMetaData serializerMetaData, ByteBuffer value, Long timestamp) {
+/*    public CassandraPurgedData addPartitonKey(String key, SerializerMetaData serializerMetaData, ByteBuffer value, Long timestamp) {
         partitonKeys.add(key);
         columnSerializerMetaDatas.put(key, serializerMetaData);
         SerializableColumnData columnData = getSerializableColumnData(value, timestamp);
@@ -100,12 +102,51 @@ public class CassandraPurgedData implements Serializable {
         columnData.setValue(ByteBufferUtil.getArray(value));
         columnData.setTimestamp(timestamp);
         return columnData;
-    }
+    }*/
 
-    public CassandraPurgedData addNonKeyColumn(String name, SerializerMetaData serializerMetaData, ByteBuffer value, Long timestamp) {
+/*    public CassandraPurgedData addNonKeyColumn(Cell cell, String name, SerializerMetaData serializerMetaData, ByteBuffer value, Long timestamp) {
         columnSerializerMetaDatas.put(name, serializerMetaData);
         SerializableColumnData columnData = getSerializableColumnData(value, timestamp);
         columnSerializedValues.put(name, columnData);
         return this;
+    }*/
+
+    public  CassandraPurgedData addNonKeyCell(SerializableCellData cellData, String columnName,  SerializerMetaData serializerMetaData) {
+        cellSerializedValues.put(cellData.getCellId(), cellData);
+        columnSerializerMetaDatas.put(columnName, serializerMetaData);
+        return this;
+    }
+
+    /**
+     * assumption that primary key are only scalar(i.e a collection type can't be part of primary key)
+     * @param key
+     * @param serializerMetaData
+     * @param value
+     * @param timestamp
+     * @return
+     */
+    public CassandraPurgedData addPartitonKey(String key, SerializerMetaData serializerMetaData, ByteBuffer value, Long timestamp) {
+        partitonKeys.add(key);
+        columnSerializerMetaDatas.put(key, serializerMetaData);
+
+        setPrimaryKeyColumnCellData(key, value);
+
+        return this;
+    }
+
+    public CassandraPurgedData addClusteringKey(String key, SerializerMetaData serializerMetaData, ByteBuffer value, Long timestamp) {
+        clusterKeys.add(key);
+        columnSerializerMetaDatas.put(key, serializerMetaData);
+
+        setPrimaryKeyColumnCellData(key, value);
+        return this;
+    }
+
+    private void setPrimaryKeyColumnCellData(String key, ByteBuffer value) {
+        SerializableCellData cellData = new SerializableCellData();
+        cellData.setCellId(key);
+        cellData.setValue(ByteBufferUtil.getArray(value));
+
+        cellSerializedValues.put(cellData.getCellId(), cellData);
     }
 }

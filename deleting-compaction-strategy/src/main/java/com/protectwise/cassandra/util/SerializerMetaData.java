@@ -1,5 +1,8 @@
 package com.protectwise.cassandra.util;
 
+import com.protectwise.cassandra.retrospect.deletion.SerializableCellData;
+import org.apache.cassandra.db.Cell;
+import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.serializers.TypeSerializer;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonSubTypes;
@@ -36,6 +39,8 @@ import java.io.Serializable;
         @JsonSubTypes.Type(value = UUIDSerializerMetaData.class, name = "UUIDSerializerMetaData"),
 })
 public abstract class SerializerMetaData implements Serializable {
+    @JsonIgnore
+    public  static final String CELL_ID_JOINER = ":";
 
     private String qualifiedClassName;
 
@@ -52,4 +57,10 @@ public abstract class SerializerMetaData implements Serializable {
 
     @JsonIgnore
     public abstract SerializerMetaData getSerializerMetaData(TypeSerializer typeSerializer);
+
+    @JsonIgnore
+    public abstract SerializableCellData getSerializableCellData(Cell cell, ColumnFamily columnFamily);
+
+    @JsonIgnore
+    public abstract Object getCellValue(byte[] bytes);
 }

@@ -1,5 +1,9 @@
 package com.protectwise.cassandra.util;
 
+import com.protectwise.cassandra.retrospect.deletion.SerializableCellData;
+import org.apache.cassandra.config.ColumnDefinition;
+import org.apache.cassandra.db.Cell;
+import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.serializers.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +23,8 @@ public class SerializerMetaDataFactory {
         Map<String, SerializerMetaData> aMap = new HashMap<>();
 
         aMap.put(SetSerializer.class.getName(), new SetSerializerMetaData());
+        aMap.put(MapSerializer.class.getName(), new MapSerializerMetaData());
+        aMap.put(ListSerializer.class.getName(), new ListSerializerMetaData());
         aMap.put(AsciiSerializer.class.getName(), new AsciiSerializerMetaData());
         aMap.put(UTF8Serializer.class.getName(), new UTF8SerializerMetaData());
         aMap.put(BooleanSerializer.class.getName(), new BooleanSerilizerMetaData());
@@ -44,5 +50,9 @@ public class SerializerMetaDataFactory {
         } else {
             throw new RuntimeException("Couldn't find serializer meta data for type serializer: " + typeSerializer.getClass().getName());
         }
+    }
+
+    public static SerializableCellData getSerializableCellData(Cell cell, ColumnFamily columnFamily) {
+       return getSerializerMetaData(columnFamily.metadata().getColumnDefinition(cell.name()).type.getSerializer()).getSerializableCellData(cell, columnFamily);
     }
 }
