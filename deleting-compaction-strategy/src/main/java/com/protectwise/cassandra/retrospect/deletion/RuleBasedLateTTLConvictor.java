@@ -634,7 +634,7 @@ public class RuleBasedLateTTLConvictor extends AbstractClusterDeletingConvictor
 		logger.info("Named row: {}", columnFamily);
 		for (Rule rule : rules)
 		{
-			logger.info("rule is: {}, with ttl: {}", rule.name, rule.ttl);
+			logger.debug("rule is: {}, with ttl: {}", rule.name, rule.ttl);
 			if (rule.testColumns(namedPkColumns))
 			{
 				partitionRules.add(rule);
@@ -648,15 +648,13 @@ public class RuleBasedLateTTLConvictor extends AbstractClusterDeletingConvictor
 					}
 				}
 			} else {
-				logger.info("rule is: {}", rule.name);
+				logger.debug("rule is: {}", rule.name);
 			}
 		}
 		if (logger.isTraceEnabled())
 		{
 			logger.trace("Partition {} being considered against {} rules", PrintHelper.print(key, cfs), partitionRules.size());
 		}
-		
-		logger.info("");
 		return true;
 	}
 

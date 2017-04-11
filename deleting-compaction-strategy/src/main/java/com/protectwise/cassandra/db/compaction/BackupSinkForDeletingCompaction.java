@@ -98,7 +98,7 @@ public class BackupSinkForDeletingCompaction implements IDeletedRecordsSink
 		if (!columnFamily.isEmpty())
 		{
 			//TODO, instead of printRow give a meaningfull name as it will put the purge data in kafka
-			printRow(this::printCellConsumer);
+			nonLocalRowArchive(this::printCellConsumer);
 			writer.append(currentKey, columnFamily);
 			columnFamily.clear();
 		}
@@ -117,14 +117,12 @@ public class BackupSinkForDeletingCompaction implements IDeletedRecordsSink
 			}
 			try {
 				if (column.value() != null && column.value().array().length > 0) {
-					//logger.info("column identifier:{}", column.name().cql3ColumnName(columnFamily.metadata()).toString());
+					logger.debug("column identifier:{}", column.name().cql3ColumnName(columnFamily.metadata()).toString());
 					//logger.info("Column value: {}", columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer().deserialize(column.value()));
 					//logger.info("Column serilizer: {}", columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer().getClass().getName());
-					int x = 1;
 				}
 			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				logger.warn("Exception occurred while printing cell", e);
 			}
 		}
 	}
@@ -132,33 +130,25 @@ public class BackupSinkForDeletingCompaction implements IDeletedRecordsSink
 	private void handleNonLocalArchiving(Cell cell, CassandraPurgedData purgedData) {
 		if (cell != null)  {
 			Cell column = cell;
-
 			ColumnDefinition columnDefinition = columnFamily.metadata().getColumnDefinition(column.name());
 			if(columnDefinition == null) {
 				return;
 			}
 			if(columnDefinition.isPrimaryKeyColumn()) {
-				logger.info("primary key: {}", column.name().cql3ColumnName(columnFamily.metadata()).toString());
+				logger.debug("primary key: {}", column.name().cql3ColumnName(columnFamily.metadata()).toString());
 				purgedData.addPartitonKey(column.name().cql3ColumnName(columnFamily.metadata()).toString(),
 						SerializerMetaDataFactory.getSerializerMetaData(columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer()),
 						column.value(), Long.valueOf(column.timestamp()));
 				return;
 			} else {
-				//logger.debug("column definition is: {}", columnDefinition);
-/*					purgedData.addNonKeyColumn(column.name().cql3ColumnName(columnFamily.metadata()).toString(),
-							SerializerMetaDataFactory.getSerializerMetaData(columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer()),
-							column.value(),
-							Long.valueOf(column.timestamp()));*/
-
 				purgedData.addNonKeyCell(SerializerMetaDataFactory.getSerializableCellData(cell, columnFamily), column.name().cql3ColumnName(columnFamily.metadata()).toString(), SerializerMetaDataFactory.getSerializerMetaData(columnFamily.metadata().getColumnDefinition(column.name()).type.getSerializer()));
 
 			}
 		}
 	}
 
-	private void printRow(Consumer<Cell> printCell) {
-		logger.info("partiton key: {}",PrintHelper.print(currentKey, columnFamily.metadata()));
-
+	//TODO: move this to a different backup sink class
+	private void nonLocalRowArchive(Consumer<Cell> printCell) {
 		CassandraPurgedData cassandraPurgedData = new CassandraPurgedData();
 		cassandraPurgedData.setKsName(columnFamily.metadata().ksName);
 		cassandraPurgedData.setCfName(columnFamily.metadata().cfName);
@@ -180,9 +170,8 @@ public class BackupSinkForDeletingCompaction implements IDeletedRecordsSink
 
 		try {
 			backupRowproducer.send(new ProducerRecord<String, String>(cassandraPurgedKafkaTopic, key, objectMapper.writeValueAsString(cassandraPurgedData)));
-			int x = 2;
 		} catch (Exception e) {
-			logger.info("Exception occurred while queuing data: {}", e);
+			logger.warn("Exception occurred while queuing data", e);
 		}
 	}
 
@@ -225,31 +214,20 @@ public class BackupSinkForDeletingCompaction implements IDeletedRecordsSink
 	@Override
 	public void accept(OnDiskAtomIterator partition)
 	{
-		logger.debug("Inside the back up sink class");
 		flush();
 		currentKey = partition.getKey();
 		numKeys++;
 		// Write through the entire partition.
-		StringBuilder strBuilder = new StringBuilder();
 		while (partition.hasNext())
 		{			
 			OnDiskAtom cell  = partition.next();
-			//strBuilder.append(PrintHelper.print(cell, cfs));
-			
 			accept(partition.getKey(), cell);
 		}
-		logger.debug("cell name, value: {}", strBuilder.toString());
 	}
 
 	@Override
 	public void accept(DecoratedKey key, OnDiskAtom cell)
 	{
-		if(cell instanceof Cell) {
-			Cell column = (Cell) cell;
-			//getPntCellConsumer().accept(column);
-		}
-
-		logger.debug("Cell type is: {}", cell.getClass());	
 		if (currentKey != key)
 		{
 			flush();
@@ -293,7 +271,7 @@ public class BackupSinkForDeletingCompaction implements IDeletedRecordsSink
 		try {
 			backupRowproducer.close();
 		}catch(Exception e) {
-			logger.error("Couldn't cleanly stop kafka producer exception {}", e);
+			logger.error("Couldn't cleanly stop kafka producer exception ", e);
 		}
 	}
 
