@@ -133,7 +133,6 @@ public final class DeletingCompactionStrategyOptions
             logger.warn("Didn't find configuration dcs_kafka_servers, compaction will revert to dry run");
         }
 
-
         String kafkaTopic = null;
         try {
             kafkaTopic = options.getOrDefault(PURGED_DATA_KAFKA_TOPIC_KEY, PURGED_DATA_KAFKA_DEFAULT_TOPIC).replaceAll("[\\s]+","");
@@ -142,6 +141,11 @@ public final class DeletingCompactionStrategyOptions
             logger.warn("Kafak topic couldn't set for purged data.  Compaction will revert to dry run.", e);
         }
 
+        // make sure we have only one option available for backup either local backup directory or kafka, not both
+        if(!dryRun && ((kafkaBootstrapServers != null) && !kafkaBootstrapServers.isEmpty()) && (backupDir != null)) {
+            logger.warn("Compaction strategy supports only one backup option, but provided both kafka and local directory, compaction will revert to dry run");
+            dryRun = true;
+        }
 
         this.deletedRecordsSinkDirectory = backupDir;
         this.dryRun = dryRun;

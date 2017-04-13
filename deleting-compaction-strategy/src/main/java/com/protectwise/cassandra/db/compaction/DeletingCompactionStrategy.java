@@ -112,9 +112,12 @@ public class DeletingCompactionStrategy extends AbstractCompactionStrategy
         for (ISSTableScanner scanner : scanners.scanners)
         {
             IDeletedRecordsSink backupSink = null;
-            if (options.deletedRecordsSinkDirectory != null)
-            {
-                backupSink = new BackupSinkForDeletingCompaction(cfs, options.deletedRecordsSinkDirectory, options.kafkaQueueBootstrapServers, options.cassandraPurgedKafkaTopic);
+            if(options.dryRun) {
+                backupSink = new DummyBackupSinkForDeletingCompaction();
+            } else if(options.deletedRecordsSinkDirectory != null) {
+                backupSink = new BackupSinkForDeletingCompaction(cfs, options.deletedRecordsSinkDirectory);
+            } else if (options.kafkaQueueBootstrapServers != null) {
+                backupSink = new KafkaBackupSinkForDeletingCompaction(cfs, options.kafkaQueueBootstrapServers, options.cassandraPurgedKafkaTopic);
             }
             filteredScanners.add(new FilteringSSTableScanner(
                     scanner,
