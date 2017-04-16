@@ -44,6 +44,7 @@ object CassandraUtilBuild extends Build {
           "-Xverify",
           "-Yclosure-elim"
         ),
+        scalacOptions ++= Seq("-Xmax-classfile-name", "254"),
         resolvers ++= Seq(
           "Sonatype OSS Releases" at "http://oss.sonatype.org/content/repositories/releases",
           "JAnalyse Repository" at "http://www.janalyse.fr/repository/"
@@ -232,6 +233,7 @@ object CassandraUtilBuild extends Build {
         case d => d
       } ++ Seq(
         "org.apache.cassandra" % "cassandra-all" % cassandraVersion % Provided,
+        "com.datastax.cassandra" % "cassandra-driver-core" % datastaxVersion % Compile,
         "org.apache.kafka" % "kafka-clients" % kafkaVersion % Compile
       ),
 
