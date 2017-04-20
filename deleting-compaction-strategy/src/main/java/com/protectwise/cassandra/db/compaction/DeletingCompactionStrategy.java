@@ -55,12 +55,14 @@ public class DeletingCompactionStrategy extends AbstractCompactionStrategy
         {
             throw new Exception("Unable to instantiate underlying compaction strategy, deleting compaction strategy cannot be started");
         }
+        logger.debug("Created DeletionCompactionStrategy");
     }
 
     public static Map<String, String> validateOptions(Map<String, String> options) throws ConfigurationException
     {
         options = AbstractCompactionStrategy.validateOptions(options);
-        return DeletingCompactionStrategyOptions.validateOptions(options);
+        Map<String, String> options2 =  DeletingCompactionStrategyOptions.validateOptions(options);
+        return options2;
     }
 
     @Override
@@ -108,10 +110,15 @@ public class DeletingCompactionStrategy extends AbstractCompactionStrategy
         for (ISSTableScanner scanner : scanners.scanners)
         {
             IDeletedRecordsSink backupSink = null;
-            if (options.deletedRecordsSinkDirectory != null)
-            {
+            /* SIMILITY START */
+            if(options.dryRun) {
+                backupSink = new DummyBackupSinkForDeletingCompaction();
+            } else if(options.deletedRecordsSinkDirectory != null) {
                 backupSink = new BackupSinkForDeletingCompaction(cfs, options.deletedRecordsSinkDirectory);
+            } else if (options.kafkaBootstrapServers != null) {
+                backupSink = new KafkaBackupSinkForDeletingCompaction(cfs, options.kafkaBootstrapServers, options.kafkaTopicForPurgedCassandraData);
             }
+            /* SIMILITY END */
             filteredScanners.add(new FilteringSSTableScanner(
                     scanner,
                     convictor,

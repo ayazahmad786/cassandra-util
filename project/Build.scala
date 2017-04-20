@@ -16,7 +16,7 @@ object CassandraUtilBuild extends Build {
   val playVersion = "2.3.+"
   val cassandraVersion = "2.1.14"
   //val cassandraVersion = "2.1.8"
-
+  val kafkaVersion = "0.9.0.1"
   val scalaVersionsToCompile = Seq("2.10.5", "2.11.6")
 
   val baseDependencies = Seq(
@@ -44,6 +44,7 @@ object CassandraUtilBuild extends Build {
           "-Xverify",
           "-Yclosure-elim"
         ),
+        scalacOptions ++= Seq("-Xmax-classfile-name", "254"),
         resolvers ++= Seq(
           "Sonatype OSS Releases" at "http://oss.sonatype.org/content/repositories/releases",
           "JAnalyse Repository" at "http://www.janalyse.fr/repository/"
@@ -67,7 +68,7 @@ object CassandraUtilBuild extends Build {
         unmanagedResourceDirectories in Test ++= (managedResourceDirectories in Compile).value
       )
 
-  lazy val root = Project(id = "cassandra-util", base = file("."), settings = defaultSettings) aggregate(protectwiseUtil, ccmTestingHelper, cqlWrapper, deletingCompactionStrategy)
+  lazy val root = Project(id = "cassandra-util", base = file("."), settings = defaultSettings) aggregate(protectwiseUtil, ccmTestingHelper, cqlWrapper, deletingCompactionStrategy, deserializerCassandraKafka)
 
   lazy val cqlWrapper = Project(
     id = "cql-wrapper", base = file("cql-wrapper"), settings = defaultSettings
@@ -124,7 +125,8 @@ object CassandraUtilBuild extends Build {
         case d if !d.configurations.isDefined => d % Provided
         case d => d
       } ++ Seq(
-        "org.apache.cassandra" % "cassandra-all" % cassandraVersion % Provided
+        "org.apache.cassandra" % "cassandra-all" % cassandraVersion % Provided,
+        "org.apache.kafka" % "kafka-clients" % kafkaVersion % Compile
       ),
 
       javaOptions in(Test, run) ++= Seq(
@@ -209,4 +211,54 @@ object CassandraUtilBuild extends Build {
       .map(_.exclude("com.sun.jmx", "jmxri"))
       .map(_.exclude("org.slf4j", "slf4j-log4j12"))
   )
+
+  lazy val deserializerCassandraKafka = Project(
+    id = "deserializer-cassandra-kafka", base = file("deserializer-cassandra-kafka"), settings = defaultSettings
+  ).settings(
+      version := Option(System.getenv("BUILD_NUMBER")).map(x => s"$libVersion.$x").getOrElse {
+        s"$libVersion${Option(System.getenv("BRANCH_ID")).map(x => s"-$x").getOrElse("")}-SNAPSHOT"
+      },
+      fork in run := true,
+      fork in Test := true,
+      test in assembly := {},
+      sources in (Compile,doc) := Seq.empty,
+      publishArtifact in (Compile, packageDoc) := false,
+      // This is a java project, don't put the scala version details in there.
+      artifactName := { (sv: ScalaVersion, module: ModuleID, artifact: Artifact) =>
+        s"${artifact.name}-${module.revision}.${artifact.extension}"
+      },
+
+      libraryDependencies := baseDependencies.map {
+        case d if !d.configurations.isDefined => d % Provided
+        case d => d
+      } ++ Seq(
+        "org.apache.cassandra" % "cassandra-all" % cassandraVersion % Provided,
+        "com.datastax.cassandra" % "cassandra-driver-core" % datastaxVersion % Compile,
+        "org.apache.kafka" % "kafka-clients" % kafkaVersion % Compile
+      ),
+
+      javaOptions in(Test, run) ++= Seq(
+        "-d64",
+        "-server",
+        "-XX:+AggressiveOpts",
+        "-XX:+UseConcMarkSweepGC",
+        "-XX:+UseParNewGC",
+        "-XX:NewRatio=1",
+        "-XX:GCTimeRatio=19",
+        "-XX:+HeapDumpOnOutOfMemoryError",
+        "-XX:MaxDirectMemorySize=512M"
+      ),
+
+      javaOptions in Test ++= Seq(
+        "-Xms2G",
+        "-Xmx4G"
+      ),
+
+      javaOptions in run ++= Seq(
+        "-Xms4G",
+        "-Xmx8G"
+      )
+
+    ).dependsOn(deletingCompactionStrategy)
+
 }

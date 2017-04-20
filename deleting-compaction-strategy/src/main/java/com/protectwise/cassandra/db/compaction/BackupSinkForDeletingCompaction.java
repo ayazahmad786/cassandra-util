@@ -17,21 +17,14 @@ package com.protectwise.cassandra.db.compaction;
 
 import org.apache.cassandra.db.*;
 import org.apache.cassandra.db.columniterator.OnDiskAtomIterator;
-import org.apache.cassandra.db.composites.CellName;
 import org.apache.cassandra.io.sstable.SSTableWriter;
 import org.apache.cassandra.io.sstable.metadata.MetadataCollector;
 import org.apache.cassandra.service.ActiveRepairService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.protectwise.cassandra.util.PrintHelper;
-
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.util.Map.Entry;
 
 public class BackupSinkForDeletingCompaction implements IDeletedRecordsSink
 {
@@ -62,6 +55,7 @@ public class BackupSinkForDeletingCompaction implements IDeletedRecordsSink
 		// Right now we're just doing one sink per compacted sstable, so they'll be pre-sorted, meaning
 		// we don't need to bother resorting the data.
 		columnFamily = ArrayBackedSortedColumns.factory.create(cfs.keyspace.getName(), cfs.getColumnFamilyName());
+
 	}
 
 	protected void flush()
@@ -80,21 +74,16 @@ public class BackupSinkForDeletingCompaction implements IDeletedRecordsSink
 		currentKey = partition.getKey();
 		numKeys++;
 		// Write through the entire partition.
-		StringBuilder strBuilder = new StringBuilder();
 		while (partition.hasNext())
 		{			
 			OnDiskAtom cell  = partition.next();
-			//strBuilder.append(PrintHelper.print(cell, cfs));
-			
 			accept(partition.getKey(), cell);
 		}
-		logger.info("cell name, value: {}", strBuilder.toString());
 	}
 
 	@Override
 	public void accept(DecoratedKey key, OnDiskAtom cell)
 	{
-			
 		if (currentKey != key)
 		{
 			flush();
