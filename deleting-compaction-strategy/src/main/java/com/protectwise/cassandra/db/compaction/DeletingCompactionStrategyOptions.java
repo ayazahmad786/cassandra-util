@@ -37,9 +37,12 @@ public final class DeletingCompactionStrategyOptions
     protected static final String DRY_RUN_KEY = "dcs_is_dry_run";
     protected static final String DELETED_RECORDS_DIRECTORY = "dcs_backup_dir";
     protected static final String STATUS_REPORT_INTERVAL = "dcs_status_report_ms";
-    protected static final String KAFKA_QUEUE_BOOTSTRAP_SERVERS_KEY = "dcs_kafka_servers";
-    protected static final String PURGED_DATA_KAFKA_TOPIC_KEY = "dcs_kafka_purged_data_topic";
-    protected static final String PURGED_DATA_KAFKA_DEFAULT_TOPIC = "cassandra_compaction_deleted_data_topic";
+
+    /* SIMILITY START */
+    protected static final String KAFKA_BOOTSTRAP_SERVERS_KEY = "dcs_kafka_servers";
+    protected static final String KAFKA_PURGED_DATA_TOPIC_KEY = "dcs_kafka_purged_data_topic";
+    protected static final String KAFKA_PURGED_DATA_DEFAULT_TOPIC = "dcs_kafka_purged_data_default_topic";
+    /* SIMILITY END */
 
     protected final String convictorClassName;
     protected final Map<String, String> convictorOptions;
@@ -49,8 +52,11 @@ public final class DeletingCompactionStrategyOptions
     protected final boolean dryRun;
     protected final File deletedRecordsSinkDirectory;
     protected final long statsReportInterval;
-    protected final String kafkaQueueBootstrapServers;
-    protected final String cassandraPurgedKafkaTopic;
+
+    /* SIMILITY START */
+    protected final String kafkaBootstrapServers;
+    protected final String kafkaTopicForPurgedCassandraData;
+    /* SIMILITY END */
     @SuppressWarnings("unchecked")
     public DeletingCompactionStrategyOptions(ColumnFamilyStore cfs, Map<String, String> options)
     {
@@ -120,10 +126,11 @@ public final class DeletingCompactionStrategyOptions
             statusReportInterval = Long.parseLong(options.get(STATUS_REPORT_INTERVAL));
         }
 
+        /* SIMILITY START */
         String kafkaBootstrapServers = "";
         try {
-            if(options.containsKey(KAFKA_QUEUE_BOOTSTRAP_SERVERS_KEY)) {
-                kafkaBootstrapServers = options.get(KAFKA_QUEUE_BOOTSTRAP_SERVERS_KEY).replaceAll("[\\s]+", "");
+            if(options.containsKey(KAFKA_BOOTSTRAP_SERVERS_KEY)) {
+                kafkaBootstrapServers = options.get(KAFKA_BOOTSTRAP_SERVERS_KEY).replaceAll("[\\s]+", "");
             } else {
                 dryRun = true;
                 logger.warn("Didn't find configuration dcs_kafka_servers, compaction will revert to dry run");
@@ -135,10 +142,10 @@ public final class DeletingCompactionStrategyOptions
 
         String kafkaTopic = null;
         try {
-            kafkaTopic = options.getOrDefault(PURGED_DATA_KAFKA_TOPIC_KEY, PURGED_DATA_KAFKA_DEFAULT_TOPIC).replaceAll("[\\s]+","");
+            kafkaTopic = options.getOrDefault(KAFKA_PURGED_DATA_TOPIC_KEY, KAFKA_PURGED_DATA_DEFAULT_TOPIC).replaceAll("[\\s]+","");
         }catch(Exception e) {
             dryRun = true;
-            logger.warn("Kafak topic couldn't set for purged data.  Compaction will revert to dry run.", e);
+            logger.warn("Kafka topic couldn't set for purged data.  Compaction will revert to dry run.", e);
         }
 
         // make sure we have only one option available for backup either local backup directory or kafka, not both
@@ -146,13 +153,17 @@ public final class DeletingCompactionStrategyOptions
             logger.warn("Compaction strategy supports only one backup option, but provided both kafka and local directory, compaction will revert to dry run");
             dryRun = true;
         }
+        /* SIMILITY END */
 
         this.deletedRecordsSinkDirectory = backupDir;
         this.dryRun = dryRun;
         this.enabled = enabled;
         this.statsReportInterval = statusReportInterval;
-        this.kafkaQueueBootstrapServers = kafkaBootstrapServers;
-        this.cassandraPurgedKafkaTopic = kafkaTopic;
+
+        /* SIMILITY START */
+        this.kafkaBootstrapServers = kafkaBootstrapServers;
+        this.kafkaTopicForPurgedCassandraData = kafkaTopic;
+        /* SIMILITY END */
     }
 
     public AbstractSimpleDeletingConvictor buildConvictor() {
@@ -231,13 +242,16 @@ public final class DeletingCompactionStrategyOptions
             options.remove(STATUS_REPORT_INTERVAL);
         }
 
-        if(options.containsKey(KAFKA_QUEUE_BOOTSTRAP_SERVERS_KEY)) {
-            options.remove(KAFKA_QUEUE_BOOTSTRAP_SERVERS_KEY);
+        /* SIMILITY START */
+        if(options.containsKey(KAFKA_BOOTSTRAP_SERVERS_KEY)) {
+            options.remove(KAFKA_BOOTSTRAP_SERVERS_KEY);
         }
 
-        if(options.containsKey(PURGED_DATA_KAFKA_TOPIC_KEY)) {
-            options.remove(PURGED_DATA_KAFKA_TOPIC_KEY);
+        if(options.containsKey(KAFKA_PURGED_DATA_TOPIC_KEY)) {
+            options.remove(KAFKA_PURGED_DATA_TOPIC_KEY);
         }
+        /* SIMILITY END */
+
         return validatePassthrough(convictor, validatePassthrough(underlyingClass, options));
     }
 

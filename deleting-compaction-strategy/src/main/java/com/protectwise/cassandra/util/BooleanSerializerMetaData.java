@@ -18,7 +18,7 @@ import java.nio.ByteBuffer;
  * Created by ayaz on 15/3/17.
  */
 @JsonTypeName("BooleanSerilizerMetaData")
-public class BooleanSerilizerMetaData extends  SerializerMetaData {
+public class BooleanSerializerMetaData extends  SerializerMetaData {
     @Override
     public TypeSerializer getSerializer() {
         return BooleanSerializer.instance;
@@ -38,15 +38,7 @@ public class BooleanSerilizerMetaData extends  SerializerMetaData {
         AbstractType<?> cellNameType = columnFamily.metadata().getValueValidator(cell.name());
         try {
             if(cellNameType instanceof BooleanType) {
-                SerializableCellData serializerCellData = new SerializableCellData();
-                //cell id is columnname
-                String cellId = "";
-                ColumnDefinition columnDefinition = columnFamily.metadata().getColumnDefinition(cell.name());
-                cellId = String.join(CELL_ID_JOINER, columnDefinition.name.toString());
-                serializerCellData.setCellId(cellId);
-                serializerCellData.setValue(ByteBufferUtil.getArray(cell.value()));
-                serializerCellData.setTimestamp(Long.valueOf(cell.timestamp()));
-                return serializerCellData;
+                return super.getSerializableCellData(cell, columnFamily);
             }else {
                 throw new RuntimeException(this.getClass().getName() + " doesn't support cellNameType: " + cellNameType.toString());
             }

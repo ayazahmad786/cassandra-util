@@ -14,7 +14,7 @@ public class SerializableCellData implements Serializable {
     private Long timestamp;
 
     //must be in increasing order
-    private List<Long> cellIdComponenetPositions;
+    private List<Long> cellIdComponentPositions;
 
     public byte[] getValue() {
         return value;
@@ -40,11 +40,11 @@ public class SerializableCellData implements Serializable {
         this.cellId = cellId;
     }
 
-    public List<Long> getCellIdComponenetPositions() {
-        return cellIdComponenetPositions;
+    public List<Long> getCellIdComponentPositions() {
+        return cellIdComponentPositions;
     }
 
-    public void setCellIdComponenetPositions(List<Long> cellIdComponenetPositions) {
-        this.cellIdComponenetPositions = cellIdComponenetPositions;
+    public void setCellIdComponentPositions(List<Long> cellIdComponentPositions) {
+        this.cellIdComponentPositions = cellIdComponentPositions;
     }
 }

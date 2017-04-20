@@ -27,7 +27,7 @@ public class SerializerMetaDataFactory {
         aMap.put(ListSerializer.class.getName(), new ListSerializerMetaData());
         aMap.put(AsciiSerializer.class.getName(), new AsciiSerializerMetaData());
         aMap.put(UTF8Serializer.class.getName(), new UTF8SerializerMetaData());
-        aMap.put(BooleanSerializer.class.getName(), new BooleanSerilizerMetaData());
+        aMap.put(BooleanSerializer.class.getName(), new BooleanSerializerMetaData());
         aMap.put(BytesSerializer.class.getName(), new BytesSerializerMetaData());
         aMap.put(DecimalSerializer.class.getName(), new DecimalSerializerMetaData());
         aMap.put(DoubleSerializer.class.getName(), new DoubleSerializerMetaData());

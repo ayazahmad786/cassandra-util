@@ -6,7 +6,6 @@ import org.apache.cassandra.db.Cell;
 import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.ListType;
-import org.apache.cassandra.db.marshal.MapType;
 import org.apache.cassandra.serializers.ListSerializer;
 import org.apache.cassandra.serializers.TypeSerializer;
 import org.apache.cassandra.utils.ByteBufferUtil;
@@ -67,7 +66,7 @@ public class ListSerializerMetaData extends SerializerMetaData {
                 serializerCellData.setCellId(cellId);
                 serializerCellData.setValue(ByteBufferUtil.getArray(cell.value()));
                 serializerCellData.setTimestamp(Long.valueOf(cell.timestamp()));
-                serializerCellData.setCellIdComponenetPositions(splitPositions);
+                serializerCellData.setCellIdComponentPositions(splitPositions);
 
                 return serializerCellData;
             } else {

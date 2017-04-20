@@ -9,6 +9,7 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.protectwise.cassandra.db.compaction.DeletingCompactionStrategyOptions;
 import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -16,7 +17,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 
 import org.codehaus.jackson.map.ObjectMapper;
-import com.protectwise.cassandra.retrospect.deletion.CassandraPurgedData;
+import com.protectwise.cassandra.retrospect.deletion.CassandraPurgedRowData;
 import com.protectwise.cassandra.retrospect.deletion.SerializableCellData;
 import com.protectwise.cassandra.util.SerializerMetaData;
 
@@ -41,24 +42,24 @@ public class TestConsumerKafkaQueuedCassandraData {
 	
 	
 	public void subscribe() {
-		consumer.subscribe(Arrays.asList("cassandra_compaction_deleted_data_topic"));
+		consumer.subscribe(Arrays.asList("dcs_kafka_purged_data_default_topic"));
 	}
 	
 	public ConsumerRecords<String, String> pollRecord() {
 		return consumer.poll(POLL_TIMEOUT);
 	}
 	
-	public CassandraPurgedData getObject(String json) {
+	public CassandraPurgedRowData getObject(String json) {
 		try {
-			return objectMapper.readValue(json, CassandraPurgedData.class);
+			return objectMapper.readValue(json, CassandraPurgedRowData.class);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
 	}
 
-	private static void printDeserializedValues(CassandraPurgedData purgedData) {
+	private static void printDeserializedValues(CassandraPurgedRowData purgedData) {
 		for(Entry<String, SerializerMetaData> columnSerializedMetaDataEntry : purgedData.getColumnSerializerMetaDatas().entrySet()) {
-			for(Entry<String, SerializableCellData> entry :purgedData.getColumnSerializedValues().entrySet()) {
+			for(Entry<String, SerializableCellData> entry :purgedData.getCellSerializedValues().entrySet()) {
 				int index = entry.getValue().getCellId().indexOf(columnSerializedMetaDataEntry.getKey());
 				if(index == 0) {
 					System.out.println(entry.getKey() + "=" + columnSerializedMetaDataEntry.getValue().getCellValue(entry.getValue().getValue()));
@@ -79,7 +80,7 @@ public class TestConsumerKafkaQueuedCassandraData {
 				try {
 					System.out.println(record.value());
 					count.incrementAndGet();
-					CassandraPurgedData purgedData = testConsumer.getObject(record.value());
+					CassandraPurgedRowData purgedData = testConsumer.getObject(record.value());
 					//printCellSerializedContent(purgedData);
 					printDeserializedValues(purgedData);
 				}catch(Exception e) {
@@ -96,8 +97,8 @@ public class TestConsumerKafkaQueuedCassandraData {
 		}
 	}
 
-	private static void printCellSerializedContent(CassandraPurgedData purgedData) {
-		for(Entry<String, SerializableCellData> entry :purgedData.getColumnSerializedValues().entrySet()) {
+	private static void printCellSerializedContent(CassandraPurgedRowData purgedData) {
+		for(Entry<String, SerializableCellData> entry :purgedData.getCellSerializedValues().entrySet()) {
             System.out.println(entry.getKey() + "= " +
                                 entry.getValue().getValue());
         }

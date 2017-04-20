@@ -66,12 +66,6 @@ public class PrintHelper
 		}
 	}
 
-	public static String print(DecoratedKey decoratedKey, CFMetaData cfMetaData) {
-		StringWriter w = new StringWriter();
-		print(decoratedKey, cfMetaData, w);
-		return w.toString();
-	}
-
 	private static void print(DecoratedKey decoratedKey, CFMetaData cfMetaData, StringWriter w) {
 		ByteBuffer[] keyParts;
 		AbstractType<?> validator = cfMetaData.getKeyValidator();

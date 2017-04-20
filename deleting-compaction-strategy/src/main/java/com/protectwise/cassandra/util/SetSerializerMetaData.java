@@ -5,14 +5,12 @@ import org.apache.cassandra.config.ColumnDefinition;
 import org.apache.cassandra.db.Cell;
 import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.db.marshal.AbstractType;
-import org.apache.cassandra.db.marshal.MapType;
 import org.apache.cassandra.db.marshal.SetType;
 import org.apache.cassandra.serializers.SetSerializer;
 import org.apache.cassandra.serializers.TypeSerializer;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.codehaus.jackson.annotate.JsonTypeName;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -69,7 +67,7 @@ public class SetSerializerMetaData extends SerializerMetaData {
                 serializerCellData.setCellId(cellId);
                 serializerCellData.setValue(ByteBufferUtil.getArray(cell.name().collectionElement()));
                 serializerCellData.setTimestamp(Long.valueOf(cell.timestamp()));
-                serializerCellData.setCellIdComponenetPositions(splitPositions);
+                serializerCellData.setCellIdComponentPositions(splitPositions);
 
                 return serializerCellData;
             } else {

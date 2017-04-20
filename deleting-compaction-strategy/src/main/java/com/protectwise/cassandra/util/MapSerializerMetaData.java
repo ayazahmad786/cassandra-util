@@ -76,7 +76,7 @@ public class MapSerializerMetaData extends SerializerMetaData {
                 serializerCellData.setCellId(cellId);
                 serializerCellData.setValue(ByteBufferUtil.getArray(cell.value()));
                 serializerCellData.setTimestamp(Long.valueOf(cell.timestamp()));
-                serializerCellData.setCellIdComponenetPositions(splitPositions);
+                serializerCellData.setCellIdComponentPositions(splitPositions);
 
                 return serializerCellData;
             } else {

@@ -1,21 +1,7 @@
-/*
- * Copyright 2016 ProtectWise, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+
 package com.protectwise.cassandra.db.compaction;
 
-import com.protectwise.cassandra.retrospect.deletion.CassandraPurgedData;
+import com.protectwise.cassandra.retrospect.deletion.CassandraPurgedRowData;
 import com.protectwise.cassandra.util.SerializerMetaDataFactory;
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.ColumnDefinition;
@@ -49,8 +35,8 @@ public class KafkaBackupSinkForDeletingCompaction implements IDeletedRecordsSink
 	protected long numCells = 0;
 	protected long numKeys = 0;
 
-	private KafkaProducer<String, String> backupRowproducer;
-	private String cassandraPurgedKafkaTopic;
+	private KafkaProducer<String, String> kafkaBackupRowProducer;
+	private String kafkaTopicForPurgedCassandraData;
 
 	public KafkaBackupSinkForDeletingCompaction(ColumnFamilyStore cfs, String kafkaServers, String cassandraPurgedKafkaTopic)
 	{
@@ -58,7 +44,7 @@ public class KafkaBackupSinkForDeletingCompaction implements IDeletedRecordsSink
 		this(cfs,  cfs.estimateKeys() / cfs.getLiveSSTableCount(), kafkaServers, cassandraPurgedKafkaTopic);
 	}
 
-	public KafkaBackupSinkForDeletingCompaction(ColumnFamilyStore cfs, long keyEstimate, String kafkaServers, String cassandraPurgedKafkaTopic)
+	public KafkaBackupSinkForDeletingCompaction(ColumnFamilyStore cfs, long keyEstimate, String kafkaServers, String kafkaTopicForPurgedCassandraData)
 	{
 		this.cfs = cfs;
 		this.keysPerSSTable = keyEstimate;
@@ -67,9 +53,9 @@ public class KafkaBackupSinkForDeletingCompaction implements IDeletedRecordsSink
 		// we don't need to bother resorting the data.
 		columnFamily = ArrayBackedSortedColumns.factory.create(cfs.keyspace.getName(), cfs.getColumnFamilyName());
 
-		this.cassandraPurgedKafkaTopic = cassandraPurgedKafkaTopic;
+		this.kafkaTopicForPurgedCassandraData = kafkaTopicForPurgedCassandraData;
 
-		this.backupRowproducer = getKafkaProducer(kafkaServers);
+		this.kafkaBackupRowProducer = getKafkaProducer(kafkaServers);
 	}
 
 	private KafkaProducer<String, String> getKafkaProducer(String kafkaServers) {
@@ -89,7 +75,7 @@ public class KafkaBackupSinkForDeletingCompaction implements IDeletedRecordsSink
 		if (!columnFamily.isEmpty())
 		{
 			//TODO, instead of printRow give a meaningfull name as it will put the purge data in kafka
-			nonLocalRowArchive(this::printCellConsumer);
+			archiveRow(this::printCellConsumer);
 			columnFamily.clear();
 		}
 	}
@@ -102,7 +88,7 @@ public class KafkaBackupSinkForDeletingCompaction implements IDeletedRecordsSink
 				return;
 			}
 			if(columnDefinition.isPrimaryKeyColumn()) {
-				logger.info("primary key: {}", column.name().cql3ColumnName(columnFamily.metadata()).toString());
+				logger.debug("primary key: {}", column.name().cql3ColumnName(columnFamily.metadata()).toString());
 				return;
 			}
 			try {
@@ -115,7 +101,7 @@ public class KafkaBackupSinkForDeletingCompaction implements IDeletedRecordsSink
 		}
 	}
 
-	private void handleNonLocalArchiving(Cell cell, CassandraPurgedData purgedData) {
+	private void handleNonKeyCell(Cell cell, CassandraPurgedRowData purgedData) {
 		if (cell != null)  {
 			Cell column = cell;
 			ColumnDefinition columnDefinition = columnFamily.metadata().getColumnDefinition(column.name());
@@ -134,8 +120,8 @@ public class KafkaBackupSinkForDeletingCompaction implements IDeletedRecordsSink
 		}
 	}
 
-	private void nonLocalRowArchive(Consumer<Cell> printCell) {
-		CassandraPurgedData cassandraPurgedData = new CassandraPurgedData();
+	private void archiveRow(Consumer<Cell> printCell) {
+		CassandraPurgedRowData cassandraPurgedData = new CassandraPurgedRowData();
 		cassandraPurgedData.setKsName(columnFamily.metadata().ksName);
 		cassandraPurgedData.setCfName(columnFamily.metadata().cfName);
 
@@ -143,7 +129,7 @@ public class KafkaBackupSinkForDeletingCompaction implements IDeletedRecordsSink
 		handlePartitionKey(currentKey, columnFamily.metadata(), cassandraPurgedData);
 		columnFamily.forEach(cell-> {
 			handleClusteringKey(cell, columnFamily.metadata(), cassandraPurgedData);
-			handleNonLocalArchiving(cell, cassandraPurgedData);
+			handleNonKeyCell(cell, cassandraPurgedData);
 		});
 
 
@@ -153,13 +139,17 @@ public class KafkaBackupSinkForDeletingCompaction implements IDeletedRecordsSink
 		String key = getKafkaMessageKey(columnFamily);
 
 		try {
-			backupRowproducer.send(new ProducerRecord<String, String>(cassandraPurgedKafkaTopic, key, objectMapper.writeValueAsString(cassandraPurgedData)));
+			kafkaBackupRowProducer.send(new ProducerRecord<String, String>(kafkaTopicForPurgedCassandraData, key, objectMapper.writeValueAsString(cassandraPurgedData)));
 		} catch (Exception e) {
-			logger.warn("Exception occurred while queuing data", e);
+			logger.warn("Exception occurred while queuing data for keyspace: {}, columnFamily: {}, partitionKey: {}, clusterKey: {}",
+					cassandraPurgedData.getKsName()
+					, cassandraPurgedData.getCfName()
+					, cassandraPurgedData.getPartitionKeys()
+					, cassandraPurgedData.getClusterKeys(), e);
 		}
 	}
 
-	private void handleClusteringKey(Cell cell, CFMetaData metadata, CassandraPurgedData cassandraPurgedData) {
+	private void handleClusteringKey(Cell cell, CFMetaData metadata, CassandraPurgedRowData cassandraPurgedData) {
 		for (ColumnDefinition def : metadata.clusteringColumns()) {
 			try {
 				cassandraPurgedData.addClusteringKey(ByteBufferUtil.string(def.name.bytes),
@@ -170,7 +160,7 @@ public class KafkaBackupSinkForDeletingCompaction implements IDeletedRecordsSink
 		}
 	}
 
-	private void handlePartitionKey(DecoratedKey currentKey, CFMetaData metadata, CassandraPurgedData cassandraPurgedData) {
+	private void handlePartitionKey(DecoratedKey currentKey, CFMetaData metadata, CassandraPurgedRowData cassandraPurgedData) {
 		ByteBuffer[] keyParts;
 		AbstractType<?> validator = metadata.getKeyValidator();
 		if (validator instanceof CompositeType) {
@@ -226,7 +216,8 @@ public class KafkaBackupSinkForDeletingCompaction implements IDeletedRecordsSink
 	@Override
 	public void begin()
 	{
-		logger.info("started the backup");
+		logger.info("started kafka based backup for ksName: {}, columnFamily: {}",
+				columnFamily.metadata().ksName, columnFamily.metadata().cfName);
 	}
 
 	@Override
@@ -235,7 +226,8 @@ public class KafkaBackupSinkForDeletingCompaction implements IDeletedRecordsSink
 		if (numKeys > 0 && numCells > 0)
 		{
 			flush();
-			logger.info("Cleanly closing backup operation for with {} keys and {} cells", numKeys, numCells);
+			logger.info("Cleanly closing backup operation for ksName: {}, columnFamily: {}, with {} keys and {} cells",
+					columnFamily.metadata().ksName, columnFamily.metadata().cfName, numKeys, numCells);
 		}
 		else
 		{
@@ -244,9 +236,10 @@ public class KafkaBackupSinkForDeletingCompaction implements IDeletedRecordsSink
 		}
 
 		try {
-			backupRowproducer.close();
+			kafkaBackupRowProducer.close();
 		}catch(Exception e) {
-			logger.error("Couldn't cleanly stop kafka producer exception ", e);
+			logger.error("Couldn't cleanly stop kafka producer for ksName: {}, columnFamily: {}",
+					columnFamily.metadata().ksName, columnFamily.metadata().cfName, e);
 		}
 	}
 
@@ -257,7 +250,7 @@ public class KafkaBackupSinkForDeletingCompaction implements IDeletedRecordsSink
 	@Override
 	public void abort()
 	{
-		logger.info("Aborting backup operation for ");
+		logger.info("Aborting backup operation for ksName: {}, columnFamily: {}", columnFamily.metadata().ksName, columnFamily.metadata().cfName);
 		columnFamily.clear();
 	}
 }

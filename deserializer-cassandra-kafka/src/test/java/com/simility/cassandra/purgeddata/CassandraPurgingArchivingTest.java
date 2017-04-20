@@ -2,7 +2,8 @@ package com.simility.cassandra.purgeddata;
 
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Session;
-import com.protectwise.cassandra.retrospect.deletion.CassandraPurgedData;
+import com.protectwise.cassandra.retrospect.deletion.CassandraPurgedRowData;
+import com.protectwise.cassandra.retrospect.deletion.SerializableCellData;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -16,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -94,8 +96,21 @@ public class CassandraPurgingArchivingTest {
         Assert.assertTrue(records.count()==1);
         ObjectMapper objectMapper = new ObjectMapper();
 
-        CassandraPurgedData purgedData = objectMapper.readValue(records.iterator().next().value(), CassandraPurgedData.class);
+        String message = records.iterator().next().value();
+        CassandraPurgedRowData purgedData = objectMapper.readValue(records.iterator().next().value(), CassandraPurgedRowData.class);
+        for(Map.Entry<String, SerializableCellData> cellDataEntry : purgedData.getCellSerializedValues().entrySet()) {
+            SerializableCellData cellData = cellDataEntry.getValue();
+            Assert.assertTrue(cellData.getCellIdComponentPositions() == null || cellData.getCellIdComponentPositions().isEmpty());
 
+            //for primitive type cellId is columnName
+            String columnName = cellData.getCellId();
+
+            Object deserializedValue = purgedData.getColumnSerializerMetaDatas().get(columnName).getCellValue(cellData.getValue());
+
+            logger.info("cell key: {}, value is: {}", cellDataEntry.getKey(), deserializedValue.toString());
+            Assert.assertNotNull(deserializedValue);
+        }
+        logger.info("message is: {}", message);
         Assert.assertNotNull(purgedData);
     }
 }

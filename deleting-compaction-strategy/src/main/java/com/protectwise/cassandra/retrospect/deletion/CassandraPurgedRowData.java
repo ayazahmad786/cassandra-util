@@ -1,8 +1,6 @@
 package com.protectwise.cassandra.retrospect.deletion;
 
 import com.protectwise.cassandra.util.SerializerMetaData;
-import org.apache.cassandra.db.Cell;
-import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
 import java.io.Serializable;
@@ -15,13 +13,12 @@ import java.util.Set;
 /**
  * Created by ayaz on 9/3/17.
  */
-public class CassandraPurgedData implements Serializable {
-
+public class CassandraPurgedRowData implements Serializable {
     private String ksName;
 
     private String cfName;
 
-    private Set<String> partitonKeys = new HashSet<>();
+    private Set<String> partitionKeys = new HashSet<>();
 
     private Set<String> clusterKeys = new HashSet<>();
 
@@ -29,12 +26,12 @@ public class CassandraPurgedData implements Serializable {
 
     private Map<String, SerializableCellData> cellSerializedValues = new HashMap<>();
 
-    public Set<String> getPartitonKeys() {
-        return partitonKeys;
+    public Set<String> getPartitionKeys() {
+        return partitionKeys;
     }
 
-    public void setPartitonKeys(Set<String> partitonKeys) {
-        this.partitonKeys = partitonKeys;
+    public void setPartitionKeys(Set<String> partitionKeys) {
+        this.partitionKeys = partitionKeys;
     }
 
     public Set<String> getClusterKeys() {
@@ -53,11 +50,11 @@ public class CassandraPurgedData implements Serializable {
         this.columnSerializerMetaDatas = columnSerializerMetaDatas;
     }
 
-    public Map<String, SerializableCellData> getColumnSerializedValues() {
+    public Map<String, SerializableCellData> getCellSerializedValues() {
         return cellSerializedValues;
     }
 
-    public void setColumnSerializedValues(Map<String, SerializableCellData> cellSerializedValues) {
+    public void setCellSerializedValues(Map<String, SerializableCellData> cellSerializedValues) {
         this.cellSerializedValues = cellSerializedValues;
     }
 
@@ -79,7 +76,7 @@ public class CassandraPurgedData implements Serializable {
         this.cfName = cfName;
     }
 
-    public  CassandraPurgedData addNonKeyCell(SerializableCellData cellData, String columnName,  SerializerMetaData serializerMetaData) {
+    public  CassandraPurgedRowData addNonKeyCell(SerializableCellData cellData, String columnName,  SerializerMetaData serializerMetaData) {
         cellSerializedValues.put(cellData.getCellId(), cellData);
         columnSerializerMetaDatas.put(columnName, serializerMetaData);
         return this;
@@ -93,8 +90,8 @@ public class CassandraPurgedData implements Serializable {
      * @param timestamp
      * @return
      */
-    public CassandraPurgedData addPartitonKey(String key, SerializerMetaData serializerMetaData, ByteBuffer value, Long timestamp) {
-        partitonKeys.add(key);
+    public CassandraPurgedRowData addPartitonKey(String key, SerializerMetaData serializerMetaData, ByteBuffer value, Long timestamp) {
+        partitionKeys.add(key);
         columnSerializerMetaDatas.put(key, serializerMetaData);
 
         setPrimaryKeyColumnCellData(key, value);
@@ -102,7 +99,7 @@ public class CassandraPurgedData implements Serializable {
         return this;
     }
 
-    public CassandraPurgedData addClusteringKey(String key, SerializerMetaData serializerMetaData, ByteBuffer value, Long timestamp) {
+    public CassandraPurgedRowData addClusteringKey(String key, SerializerMetaData serializerMetaData, ByteBuffer value, Long timestamp) {
         clusterKeys.add(key);
         columnSerializerMetaDatas.put(key, serializerMetaData);
 

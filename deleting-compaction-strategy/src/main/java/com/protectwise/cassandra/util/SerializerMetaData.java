@@ -1,9 +1,11 @@
 package com.protectwise.cassandra.util;
 
 import com.protectwise.cassandra.retrospect.deletion.SerializableCellData;
+import org.apache.cassandra.config.ColumnDefinition;
 import org.apache.cassandra.db.Cell;
 import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.serializers.TypeSerializer;
+import org.apache.cassandra.utils.ByteBufferUtil;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonSubTypes;
 import org.codehaus.jackson.annotate.JsonTypeInfo;
@@ -20,7 +22,7 @@ import java.io.Serializable;
         property = "type")
 @JsonSubTypes({
         @JsonSubTypes.Type(value = AsciiSerializerMetaData.class, name = "AsciiSerializerMetaData"),
-        @JsonSubTypes.Type(value = BooleanSerilizerMetaData.class, name = "BooleanSerilizerMetaData"),
+        @JsonSubTypes.Type(value = BooleanSerializerMetaData.class, name = "BooleanSerializerMetaData"),
         @JsonSubTypes.Type(value = BytesSerializerMetaData.class, name = "BytesSerializerMetaData"),
         @JsonSubTypes.Type(value = DecimalSerializerMetaData.class, name = "DecimalSerializerMetaData"),
         @JsonSubTypes.Type(value = DoubleSerializerMetaData.class, name = "DoubleSerializerMetaData"),
@@ -58,8 +60,24 @@ public abstract class SerializerMetaData implements Serializable {
     @JsonIgnore
     public abstract SerializerMetaData getSerializerMetaData(TypeSerializer typeSerializer);
 
+    /**
+     * This should be used only when cell is primitive type
+     * @param cell
+     * @param columnFamily
+     * @return
+     */
     @JsonIgnore
-    public abstract SerializableCellData getSerializableCellData(Cell cell, ColumnFamily columnFamily);
+    public SerializableCellData getSerializableCellData(Cell cell, ColumnFamily columnFamily) {
+        SerializableCellData serializerCellData = new SerializableCellData();
+        //cell id is columnname
+        String cellId = "";
+        ColumnDefinition columnDefinition = columnFamily.metadata().getColumnDefinition(cell.name());
+        cellId = String.join(CELL_ID_JOINER, columnDefinition.name.toString());
+        serializerCellData.setCellId(cellId);
+        serializerCellData.setValue(ByteBufferUtil.getArray(cell.value()));
+        serializerCellData.setTimestamp(Long.valueOf(cell.timestamp()));
+        return serializerCellData;
+    }
 
     @JsonIgnore
     public abstract Object getCellValue(byte[] bytes);
